@@ -31,8 +31,8 @@ export default function SearchHeader({
               placeholder="Enter email account (e.g., user)"
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <div className="text-gray-500 self-center mr-10">
-              {domain ? `@${domain}` : undefined}
+            <div className="text-gray-500 self-center mr-10 font-mono">
+              @{domain || "..."}
             </div>
             <button
               onClick={onSearch}
