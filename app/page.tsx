@@ -36,19 +36,28 @@ export default function Home() {
     if (!account.trim()) return;
 
     const interval = setInterval(() => {
-      performSearch(account);
+      performSearch(account, true); // Preserve selection on auto-refresh
     }, 60000); // 60 seconds
 
     return () => clearInterval(interval);
-  }, [account]);
+  }, [account, selectedEmail]);
 
-  const performSearch = async (searchAccount: string) => {
+  const performSearch = async (
+    searchAccount: string,
+    preserveSelection = false
+  ) => {
     const searchParam = searchAccount.trim().split("@")[0];
     if (!searchParam) return;
 
-    setLoading(true);
-    setSelectedEmail(null);
-    setEmailContent(null);
+    // Only show loading state for manual searches, not background refreshes
+    if (!preserveSelection) setLoading(true);
+
+    const currentSelectedEmail = preserveSelection ? selectedEmail : null;
+
+    if (!preserveSelection) {
+      setSelectedEmail(null);
+      setEmailContent(null);
+    }
 
     try {
       const response = await fetch(
@@ -56,6 +65,18 @@ export default function Home() {
       );
       const data = await response.json();
       setEmails(data);
+
+      // If preserving selection, check if selected email still exists
+      if (preserveSelection && currentSelectedEmail) {
+        const emailStillExists = data.some(
+          (email: Email) => email.messageId === currentSelectedEmail
+        );
+        if (!emailStillExists) {
+          setSelectedEmail(null);
+          setEmailContent(null);
+          setParsedText(null);
+        }
+      }
     } catch (error) {
       console.error("Error fetching emails:", error);
     } finally {
@@ -110,17 +131,15 @@ export default function Home() {
       />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {!loading && (
-          <EmailTable
-            emails={emails}
-            selectedEmail={selectedEmail}
-            emailContent={emailContent}
-            parsedText={parsedText}
-            activeTab={activeTab}
-            onRowClick={handleRowClick}
-            onTabChange={setActiveTab}
-          />
-        )}
+        <EmailTable
+          emails={emails}
+          selectedEmail={selectedEmail}
+          emailContent={emailContent}
+          parsedText={parsedText}
+          activeTab={activeTab}
+          onRowClick={handleRowClick}
+          onTabChange={setActiveTab}
+        />
       </main>
     </div>
   );
