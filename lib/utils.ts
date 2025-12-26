@@ -13,6 +13,16 @@ export function formatTimeAgo(timestamp: string): string {
   return `${days} days ago`;
 }
 
+function _cleanText(text: string): string {
+  return text
+    .replace(/\r/g, "")
+    .replace(/ +/g, " ")
+    .replace(/ \n/g, "\n")
+    .replace(/\n /g, "\n")
+    .replace(/\n\n+/g, "\n")
+    .trim();
+}
+
 export async function extractTextFromMime(content: string): Promise<string> {
   try {
     const parser = new PostalMime();
@@ -20,11 +30,11 @@ export async function extractTextFromMime(content: string): Promise<string> {
 
     // Return text content, fallback to HTML content with tags stripped
     if (email.text) {
-      return email.text;
+      return _cleanText(email.text);
     }
 
     if (email.html) {
-      return email.html.replace(/<[^>]*>/g, "").trim();
+      return _cleanText(email.html.replace(/<[^>]*>/g, ""));
     }
 
     return "No readable content found";
