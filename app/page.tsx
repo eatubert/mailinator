@@ -13,6 +13,7 @@ export default function Home() {
   const [account, setAccount] = useState("");
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
   const [emailContent, setEmailContent] = useState<string | null>(null);
   const [parsedText, setParsedText] = useState<string | null>(null);
@@ -51,6 +52,7 @@ export default function Home() {
 
     // Only show loading state for manual searches, not background refreshes
     if (!preserveSelection) setLoading(true);
+    setHasSearched(true);
 
     const currentSelectedEmail = preserveSelection ? selectedEmail : null;
 
@@ -120,26 +122,41 @@ export default function Home() {
     }
   };
 
+  const handleAccountChange = (value: string) => {
+    setAccount(value);
+    setHasSearched(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <SearchHeader
         account={account}
         loading={loading}
-        onAccountChange={setAccount}
+        onAccountChange={handleAccountChange}
         onSearch={handleSearch}
         inputRef={inputRef}
       />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <EmailTable
-          emails={emails}
-          selectedEmail={selectedEmail}
-          emailContent={emailContent}
-          parsedText={parsedText}
-          activeTab={activeTab}
-          onRowClick={handleRowClick}
-          onTabChange={setActiveTab}
-        />
+        {loading ? (
+          <div className="text-center text-gray-500 mt-8">Loading...</div>
+        ) : !hasSearched ? (
+          <div className="text-center text-gray-500 mt-8">
+            Enter an email address and click Search to view messages
+          </div>
+        ) : emails.length === 0 ? (
+          <div className="text-center text-gray-500 mt-8">Empty mailbox</div>
+        ) : (
+          <EmailTable
+            emails={emails}
+            selectedEmail={selectedEmail}
+            emailContent={emailContent}
+            parsedText={parsedText}
+            activeTab={activeTab}
+            onRowClick={handleRowClick}
+            onTabChange={setActiveTab}
+          />
+        )}
       </main>
     </div>
   );

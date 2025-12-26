@@ -22,13 +22,7 @@ export default function EmailTable({
   onRowClick,
   onTabChange,
 }: EmailTableProps) {
-  if (emails.length === 0) {
-    return (
-      <div className="text-center text-gray-500 py-12">
-        Enter an email address and click Search to view messages
-      </div>
-    );
-  }
+  if (emails.length === 0) return undefined;
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
