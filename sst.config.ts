@@ -1,6 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="./.sst/platform/config.d.ts" />
 
+const RUNTIME = "nodejs22.x";
+
 export default $config({
   app(input) {
     return {
@@ -32,6 +34,10 @@ export default $config({
       $app.stage == "production" ? DOMAIN_NAME : `${$app.stage}.${DOMAIN_NAME}`;
 
     const resourceName = "mailcheff-emails";
+
+    $transform(sst.aws.Function, (args) => {
+      args.runtime = RUNTIME;
+    });
 
     const mailBucket =
       $app.stage === "production"
