@@ -34,46 +34,52 @@ export async function handler(event: SESEvent) {
 
     console.log(
       `Storing email ${messageId} in DynamoDB for destinations:`,
+      destinations,
+    );
+
+    // Email addresses are case-insensitive: normalize to lowercase and dedupe
+    const domainSuffix = `@${DOMAIN_NAME.toLowerCase()}`;
+    const localParts = new Set(
       destinations
+        .map((dest) => dest.trim().toLowerCase())
+        .filter((dest) => dest.endsWith(domainSuffix))
+        .map((dest) => dest.split("@")[0]),
     );
 
     await Promise.all(
-      destinations
-        .filter((dest) => dest.endsWith(`@${DOMAIN_NAME}`))
-        .map((dest) => dest.split("@")[0])
-        .map(async (dest) => {
-          console.log("Storing for destination:", dest);
+      [...localParts].map(async (dest) => {
+        console.log("Storing for destination:", dest);
 
-          try {
-            await dynamoClient.send(
-              new PutItemCommand({
-                TableName: Resource.MailTable.name,
-                Item: {
-                  messageId: { S: messageId },
-                  timestamp: { S: timestamp },
-                  sender: { S: sender },
-                  destination: { S: dest },
-                  source: { S: source },
-                  s3Key: { S: s3Key },
-                  subject: {
-                    S: subject,
-                  },
-                  expiresAt: { N: expiresAt.toString() },
+        try {
+          await dynamoClient.send(
+            new PutItemCommand({
+              TableName: Resource.MailTable.name,
+              Item: {
+                messageId: { S: messageId },
+                timestamp: { S: timestamp },
+                sender: { S: sender },
+                destination: { S: dest },
+                source: { S: source },
+                s3Key: { S: s3Key },
+                subject: {
+                  S: subject,
                 },
-              })
-            );
+                expiresAt: { N: expiresAt.toString() },
+              },
+            }),
+          );
 
-            console.log(
-              `Stored email ${messageId} in DynamoDB for ${dest} ${timestamp}`
-            );
-          } catch (error) {
-            console.error(
-              `Error storing email ${messageId} in DynamoDB for ${dest} ${timestamp}:`,
-              error
-            );
-            throw error;
-          }
-        })
+          console.log(
+            `Stored email ${messageId} in DynamoDB for ${dest} ${timestamp}`,
+          );
+        } catch (error) {
+          console.error(
+            `Error storing email ${messageId} in DynamoDB for ${dest} ${timestamp}:`,
+            error,
+          );
+          throw error;
+        }
+      }),
     );
   }
 

@@ -45,7 +45,7 @@ export default function Home() {
 
   const performSearch = async (
     searchAccount: string,
-    preserveSelection = false
+    preserveSelection = false,
   ) => {
     const searchParam = searchAccount.trim().split("@")[0];
     if (!searchParam) return;
@@ -63,7 +63,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `/api/emails?destination=${encodeURIComponent(searchParam)}`
+        `/api/emails?destination=${encodeURIComponent(searchParam)}`,
       );
       const data = await response.json();
       setEmails(data);
@@ -71,7 +71,7 @@ export default function Home() {
       // If preserving selection, check if selected email still exists
       if (preserveSelection && currentSelectedEmail) {
         const emailStillExists = data.some(
-          (email: Email) => email.messageId === currentSelectedEmail
+          (email: Email) => email.messageId === currentSelectedEmail,
         );
         if (!emailStillExists) {
           setSelectedEmail(null);
@@ -89,10 +89,12 @@ export default function Home() {
   const handleSearch = async () => {
     if (!account.trim()) return;
 
-    // Update URL with search parameter
-    router.push(`?account=${encodeURIComponent(account)}`);
+    const lcAccount = account.toLowerCase();
 
-    await performSearch(account);
+    // Update URL with search parameter
+    router.push(`?account=${encodeURIComponent(lcAccount)}`);
+
+    await performSearch(lcAccount);
   };
 
   const handleRowClick = async (email: Email) => {
@@ -109,7 +111,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `/api/email?s3Key=${encodeURIComponent(email.s3Key)}`
+        `/api/email?s3Key=${encodeURIComponent(email.s3Key)}`,
       );
       const data = await response.json();
       setEmailContent(data.content);

@@ -11,7 +11,7 @@ const dynamoClient = new DynamoDBClient({});
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const destination = searchParams.get("destination");
+  const destination = searchParams.get("destination")?.trim().toLowerCase();
 
   if (!destination) {
     return NextResponse.json(
