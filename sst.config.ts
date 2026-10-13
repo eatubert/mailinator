@@ -78,7 +78,7 @@ export default $config({
 
     if ($app.stage === "production") {
       // Add lifecycle rule to delete objects after 1 day
-      new aws.s3.BucketLifecycleConfigurationV2("MailBucketLifecycle", {
+      new aws.s3.BucketLifecycleConfiguration("MailBucketLifecycle", {
         bucket: mailBucket.name,
         rules: [
           {
@@ -101,7 +101,7 @@ export default $config({
         name: `${DOMAIN_NAME}.`,
       });
 
-      const region = aws.getRegionOutput().name;
+      const region = aws.getRegionOutput().region;
 
       new aws.route53.Record("MxRecord", {
         zoneId: hostedZone.zoneId,
