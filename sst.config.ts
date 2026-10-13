@@ -167,9 +167,148 @@ export default $config({
       });
     }
 
+    // WAF for the CloudFront distribution: rate limit per IP, then allow only
+    // the paths the app actually serves and block everything else.
+    const webAcl = $dev ? undefined : createWebAcl();
+
     new sst.aws.Nextjs("Mailinator", {
       domain,
       link: [mailBucket, mailTable],
+      transform: {
+        cdn: (args) => {
+          if (!webAcl) return;
+          args.transform = {
+            ...args.transform,
+            distribution: (distArgs) => {
+              distArgs.webAclId = webAcl.arn;
+            },
+          };
+        },
+      },
     });
+
+    function createWebAcl() {
+      // Max page/API requests per IP per minute. 10 is the AWS minimum; a
+      // visit uses ~2 plus 1 per auto-refresh and 1 per email opened.
+      const RATE_LIMIT = 10;
+      const RATE_LIMIT_WINDOW_SEC = 60;
+
+      const ALLOWED_EXACT_PATHS = [
+        "/",
+        "/api/emails",
+        "/api/email",
+        "/manifest.json",
+        "/favicon.ico",
+        "/icon0.svg",
+        "/icon1.png",
+        "/apple-icon.png",
+        "/web-app-manifest-192x192.png",
+        "/web-app-manifest-512x512.png",
+      ];
+      const ALLOWED_PATH_PREFIXES = ["/_next/static/"];
+
+      const pathMatch = (
+        searchString: string,
+        positionalConstraint: "EXACTLY" | "STARTS_WITH"
+      ) => ({
+        byteMatchStatement: {
+          searchString,
+          positionalConstraint,
+          fieldToMatch: { uriPath: {} },
+          textTransformations: [{ priority: 0, type: "NONE" }],
+        },
+      });
+
+      const visibilityConfig = (metricName: string) => ({
+        cloudwatchMetricsEnabled: true,
+        metricName,
+        sampledRequestsEnabled: true,
+      });
+
+      // CLOUDFRONT-scoped web ACLs must be created in us-east-1
+      const usEast1 = new aws.Provider("WafProvider", { region: "us-east-1" });
+
+      const webAcl = new aws.wafv2.WebAcl(
+        "MailinatorWaf",
+        {
+          scope: "CLOUDFRONT",
+          defaultAction: { block: {} },
+          rules: [
+            {
+              name: "RateLimitPerIp",
+              priority: 0,
+              action: { block: {} },
+              statement: {
+                rateBasedStatement: {
+                  limit: RATE_LIMIT,
+                  aggregateKeyType: "IP",
+                  evaluationWindowSec: RATE_LIMIT_WINDOW_SEC,
+                  // Only count requests that hit the server Lambda; a cold
+                  // page load fetches ~15 static files that would trip it
+                  scopeDownStatement: {
+                    orStatement: {
+                      statements: [
+                        pathMatch("/", "EXACTLY"),
+                        pathMatch("/api/", "STARTS_WITH"),
+                      ],
+                    },
+                  },
+                },
+              },
+              visibilityConfig: visibilityConfig("RateLimitPerIp"),
+            },
+            {
+              name: "AllowKnownPaths",
+              priority: 1,
+              action: { allow: {} },
+              statement: {
+                orStatement: {
+                  statements: [
+                    ...ALLOWED_EXACT_PATHS.map((p) => pathMatch(p, "EXACTLY")),
+                    ...ALLOWED_PATH_PREFIXES.map((p) =>
+                      pathMatch(p, "STARTS_WITH")
+                    ),
+                  ],
+                },
+              },
+              visibilityConfig: visibilityConfig("AllowKnownPaths"),
+            },
+          ],
+          visibilityConfig: visibilityConfig("MailinatorWaf"),
+        },
+        { provider: usEast1 }
+      );
+
+      // Log blocked requests only. WAF requires the "aws-waf-logs-" prefix.
+      const wafLogGroup = new aws.cloudwatch.LogGroup(
+        "MailinatorWafLogs",
+        {
+          name: `aws-waf-logs-mailinator-${$app.stage}`,
+          retentionInDays: 30,
+        },
+        { provider: usEast1 }
+      );
+
+      new aws.wafv2.WebAclLoggingConfiguration(
+        "MailinatorWafLogging",
+        {
+          resourceArn: webAcl.arn,
+          logDestinationConfigs: [wafLogGroup.arn],
+          loggingFilter: {
+            defaultBehavior: "DROP",
+            filters: [
+              {
+                behavior: "KEEP",
+                requirement: "MEETS_ANY",
+                conditions: [{ actionCondition: { action: "BLOCK" } }],
+              },
+            ],
+          },
+        },
+        { provider: usEast1 }
+      );
+
+      return webAcl;
+    }
   },
 });
