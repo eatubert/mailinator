@@ -192,6 +192,7 @@ export default $config({
       // visit uses ~2 plus 1 per auto-refresh and 1 per email opened.
       const RATE_LIMIT = 10;
       const RATE_LIMIT_WINDOW_SEC = 60;
+      const BYPASS_TOKEN = process.env.WAF_BYPASS_TOKEN;
 
       const ALLOWED_EXACT_PATHS = [
         "/",
@@ -234,9 +235,29 @@ export default $config({
           scope: "CLOUDFRONT",
           defaultAction: { block: {} },
           rules: [
+            // Lets automated tests skip the rate limit by sending the secret
+            // x-waf-bypass header
+            ...(BYPASS_TOKEN
+              ? [
+                  {
+                    name: "AllowE2EBypass",
+                    priority: 0,
+                    action: { allow: {} },
+                    statement: {
+                      byteMatchStatement: {
+                        searchString: BYPASS_TOKEN,
+                        positionalConstraint: "EXACTLY",
+                        fieldToMatch: { singleHeader: { name: "x-waf-bypass" } },
+                        textTransformations: [{ priority: 0, type: "NONE" }],
+                      },
+                    },
+                    visibilityConfig: visibilityConfig("AllowE2EBypass"),
+                  },
+                ]
+              : []),
             {
               name: "RateLimitPerIp",
-              priority: 0,
+              priority: 1,
               action: { block: {} },
               statement: {
                 rateBasedStatement: {
@@ -259,7 +280,7 @@ export default $config({
             },
             {
               name: "AllowKnownPaths",
-              priority: 1,
+              priority: 2,
               action: { allow: {} },
               statement: {
                 orStatement: {

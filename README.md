@@ -46,6 +46,7 @@ Copy .env.example to .env, and fill in the values.
 - **DOMAIN_NAME**: The name of a domain correctly configured in Route53
 - **S3_DAYS_TO_LIVE**: Number of days to keep emails in S3 (default: 1)
 - **DYNAMO_HOURS_TO_LIVE**: Number of hours to keep email metadata in DynamoDB (default: 1)
+- **WAF_BYPASS_TOKEN**: Optional secret; requests sending it in the `x-waf-bypass` header skip the WAF rate limit (for automated tests)
 
 The production environment _must_ be deployed before running dev. This is necessary for email configuration in AWS.
 
@@ -133,6 +134,7 @@ The project uses SST v3 to manage AWS infrastructure with separate configuration
 - `DOMAIN_NAME` - Domain configured in Route53 (required for SST deployment)
 - `S3_DAYS_TO_LIVE` - Days to keep emails in S3 (default: 1)
 - `DYNAMO_HOURS_TO_LIVE` - Hours to keep email metadata in DynamoDB (default: 1)
+- `WAF_BYPASS_TOKEN` - Optional secret for the `x-waf-bypass` header that skips the WAF rate limit
 
 ### Runtime
 
