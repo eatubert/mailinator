@@ -1,3 +1,4 @@
+import next from "eslint-config-next/core-web-vitals";
 import unusedImports from "eslint-plugin-unused-imports";
 import tseslint from "typescript-eslint";
 
@@ -15,6 +16,9 @@ const eslintConfig = [
       "sst-env.d.ts",
     ],
   },
+  // Next.js rules: react, react-hooks, jsx-a11y, @next/next, Core Web Vitals
+  ...next,
+  // TypeScript recommended rules
   ...tseslint.configs.recommended,
   {
     files: ["**/*.{js,jsx,ts,tsx}"],
@@ -22,10 +26,9 @@ const eslintConfig = [
       "unused-imports": unusedImports,
     },
     rules: {
-      // Turn off the built-in ESLint unused vars rule
+      // Defer unused-vars handling to the unused-imports plugin (single source of truth)
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": "off",
-      // Enable the unused-imports plugin rules
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
         "warn",

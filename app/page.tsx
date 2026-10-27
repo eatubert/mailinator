@@ -5,12 +5,14 @@ import SearchHeader from "@/components/SearchHeader";
 import { extractTextFromMime } from "@/lib/utils";
 import { Email } from "@/types/email";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [account, setAccount] = useState("");
+  const [account, setAccount] = useState(
+    () => searchParams.get("account") ?? "",
+  );
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -19,18 +21,64 @@ export default function Home() {
   const [parsedText, setParsedText] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"raw" | "text">("text");
   const inputRef = useRef<HTMLInputElement>(null);
+  // Account from the URL at mount; cleared once its search has run.
+  const initialAccount = useRef(account);
 
+  const performSearch = useCallback(
+    async (searchAccount: string, preserveSelection = false) => {
+      const searchParam = searchAccount.trim().split("@")[0];
+      if (!searchParam) return;
+
+      // Only show loading state for manual searches, not background refreshes
+      if (!preserveSelection) setLoading(true);
+      setHasSearched(true);
+
+      const currentSelectedEmail = preserveSelection ? selectedEmail : null;
+
+      if (!preserveSelection) {
+        setSelectedEmail(null);
+        setEmailContent(null);
+      }
+
+      try {
+        const response = await fetch(
+          `/api/emails?destination=${encodeURIComponent(searchParam)}`,
+        );
+        const data = await response.json();
+        setEmails(data);
+
+        // If preserving selection, check if selected email still exists
+        if (preserveSelection && currentSelectedEmail) {
+          const emailStillExists = data.some(
+            (email: Email) => email.messageId === currentSelectedEmail,
+          );
+          if (!emailStillExists) {
+            setSelectedEmail(null);
+            setEmailContent(null);
+            setParsedText(null);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching emails:", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [selectedEmail],
+  );
+
+  // Focus the search input once on mount.
   useEffect(() => {
     inputRef.current?.focus();
-
-    // Check if there's a search param in the URL
-    const accountParam = searchParams.get("account");
-    if (accountParam) {
-      setAccount(accountParam);
-      // Trigger search automatically
-      performSearch(accountParam);
-    }
   }, []);
+
+  // Trigger an automatic search once if the URL seeded an account.
+  useEffect(() => {
+    const seeded = initialAccount.current;
+    if (!seeded) return;
+    initialAccount.current = "";
+    performSearch(seeded);
+  }, [performSearch]);
 
   // Auto-refresh search every minute
   useEffect(() => {
@@ -41,50 +89,7 @@ export default function Home() {
     }, 60000); // 60 seconds
 
     return () => clearInterval(interval);
-  }, [account, selectedEmail]);
-
-  const performSearch = async (
-    searchAccount: string,
-    preserveSelection = false,
-  ) => {
-    const searchParam = searchAccount.trim().split("@")[0];
-    if (!searchParam) return;
-
-    // Only show loading state for manual searches, not background refreshes
-    if (!preserveSelection) setLoading(true);
-    setHasSearched(true);
-
-    const currentSelectedEmail = preserveSelection ? selectedEmail : null;
-
-    if (!preserveSelection) {
-      setSelectedEmail(null);
-      setEmailContent(null);
-    }
-
-    try {
-      const response = await fetch(
-        `/api/emails?destination=${encodeURIComponent(searchParam)}`,
-      );
-      const data = await response.json();
-      setEmails(data);
-
-      // If preserving selection, check if selected email still exists
-      if (preserveSelection && currentSelectedEmail) {
-        const emailStillExists = data.some(
-          (email: Email) => email.messageId === currentSelectedEmail,
-        );
-        if (!emailStillExists) {
-          setSelectedEmail(null);
-          setEmailContent(null);
-          setParsedText(null);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching emails:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [account, selectedEmail, performSearch]);
 
   const handleSearch = async () => {
     if (!account.trim()) return;
