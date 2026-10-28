@@ -226,6 +226,17 @@ export default $config({
         sampledRequestsEnabled: true,
       });
 
+      const methodMatch = (
+        method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "PATCH"
+      ) => ({
+        byteMatchStatement: {
+          searchString: method,
+          positionalConstraint: "EXACTLY" as const,
+          fieldToMatch: { method: {} },
+          textTransformations: [{ priority: 0, type: "NONE" }],
+        },
+      });
+
       // CLOUDFRONT-scoped web ACLs must be created in us-east-1
       const usEast1 = new aws.Provider("WafProvider", { region: "us-east-1" });
 
@@ -279,8 +290,26 @@ export default $config({
               visibilityConfig: visibilityConfig("RateLimitPerIp"),
             },
             {
-              name: "AllowKnownPaths",
+              // The UI never POSTs to "/": search is a client-side GET to
+              // /api/emails and there are no forms or server actions. Block
+              // POST / to drop server-action probes (e.g. the bogus
+              // "cachefn" server reference) at the edge.
+              name: "BlockPostRoot",
               priority: 2,
+              action: { block: {} },
+              statement: {
+                andStatement: {
+                  statements: [
+                    pathMatch("/", "EXACTLY"),
+                    methodMatch("POST"),
+                  ],
+                },
+              },
+              visibilityConfig: visibilityConfig("BlockPostRoot"),
+            },
+            {
+              name: "AllowKnownPaths",
+              priority: 3,
               action: { allow: {} },
               statement: {
                 orStatement: {
