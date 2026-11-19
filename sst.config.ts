@@ -329,7 +329,7 @@ export default $config({
         { provider: usEast1 }
       );
 
-      // Log blocked requests only. WAF requires the "aws-waf-logs-" prefix.
+      // Log blocked and allowed requests. WAF requires the "aws-waf-logs-" prefix.
       const wafLogGroup = new aws.cloudwatch.LogGroup(
         "MailinatorWafLogs",
         {
@@ -344,13 +344,18 @@ export default $config({
         {
           resourceArn: webAcl.arn,
           logDestinationConfigs: [wafLogGroup.arn],
+          // Allowed requests are logged now, so keep the bypass token out
+          redactedFields: [{ singleHeader: { name: "x-waf-bypass" } }],
           loggingFilter: {
             defaultBehavior: "DROP",
             filters: [
               {
                 behavior: "KEEP",
                 requirement: "MEETS_ANY",
-                conditions: [{ actionCondition: { action: "BLOCK" } }],
+                conditions: [
+                  { actionCondition: { action: "BLOCK" } },
+                  { actionCondition: { action: "ALLOW" } },
+                ],
               },
             ],
           },
