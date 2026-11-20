@@ -13,6 +13,7 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
       "sst.config.ts",
+      "waf.config.ts",
       "sst-env.d.ts",
     ],
   },
